@@ -30,6 +30,10 @@ Route::middleware('auth:sanctum')->group(function () {
         [\App\Http\Controllers\Api\ShopApplicationController::class, 'mine']
     );
 
+    Route::get('/my-shops',
+        [\App\Http\Controllers\Api\MyShopController::class, 'index']
+    );
+
     Route::get('/admin/shop-applications',
         [\App\Http\Controllers\Api\Admin\ShopApprovalController::class, 'index']
     );

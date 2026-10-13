@@ -18,7 +18,16 @@ class ShopApprovalController extends Controller
             403
         );
 
-        $query = DB::table('shop_applications');
+        $query = DB::table('shop_applications')
+            ->leftJoin('users', 'users.id', '=', 'shop_applications.applicant_user_id')
+            ->leftJoin('shops', 'shops.id', '=', 'shop_applications.shop_id')
+            ->select(
+                'shop_applications.*',
+                'users.name as applicant_name',
+                'users.email as applicant_email',
+                'shops.name as shop_name',
+                'shops.code as shop_code'
+            );
 
         if ($request->query('status')) {
             $status = $request->validate([

@@ -54,6 +54,19 @@ class ShopApprovalTest extends TestCase
         ]);
     }
 
+    public function test_invalid_application_data_is_rejected(): void
+    {
+        $customer = User::factory()->create();
+
+        $this->actingAs($customer)
+            ->postJson('/api/shop-applications', [
+                'business_name' => '',
+                'phone' => str_repeat('1', 31),
+            ])
+            ->assertUnprocessable()
+            ->assertJsonValidationErrors(['business_name', 'phone']);
+    }
+
     public function test_duplicate_pending_application_is_rejected(): void
     {
         $customer = User::factory()->create();
@@ -173,6 +186,24 @@ class ShopApprovalTest extends TestCase
             ->assertJsonCount(1, 'applications');
     }
 
+    public function test_customer_can_retrieve_application_status_and_review_notes(): void
+    {
+        $customer = User::factory()->create();
+        $id = $this->submitApplication($customer);
+
+        DB::table('shop_applications')->where('id', $id)->update([
+            'status' => 'rejected',
+            'review_notes' => 'Please provide a clearer business address.',
+        ]);
+
+        $this->actingAs($customer)
+            ->getJson('/api/shop-applications/mine')
+            ->assertOk()
+            ->assertJsonPath('applications.0.id', $id)
+            ->assertJsonPath('applications.0.status', 'rejected')
+            ->assertJsonPath('applications.0.review_notes', 'Please provide a clearer business address.');
+    }
+
     public function test_customer_cannot_list_admin_applications(): void
     {
         $customer = User::factory()->create();
@@ -180,5 +211,38 @@ class ShopApprovalTest extends TestCase
         $this->actingAs($customer)
             ->getJson('/api/admin/shop-applications')
             ->assertForbidden();
+    }
+
+    public function test_super_admin_can_list_all_applications(): void
+    {
+        $admin = User::factory()->create(['platform_role' => 'super_admin']);
+        $applicant = User::factory()->create();
+
+        $this->submitApplication($applicant);
+
+        $this->actingAs($admin)
+            ->getJson('/api/admin/shop-applications')
+            ->assertOk()
+            ->assertJsonPath('total', 1)
+            ->assertJsonPath('data.0.business_name', 'SmartStock Test Shop');
+    }
+
+    public function test_invalid_review_decision_is_rejected(): void
+    {
+        $applicant = User::factory()->create();
+        $admin = User::factory()->create(['platform_role' => 'super_admin']);
+        $id = $this->submitApplication($applicant);
+
+        $this->actingAs($admin)
+            ->postJson("/api/admin/shop-applications/{$id}/review", [
+                'decision' => 'pending',
+            ])
+            ->assertUnprocessable()
+            ->assertJsonValidationErrors(['decision']);
+
+        $this->assertDatabaseHas('shop_applications', [
+            'id' => $id,
+            'status' => 'pending',
+        ]);
     }
 }
