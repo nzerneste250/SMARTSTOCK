@@ -117,6 +117,18 @@ $fixture = json_decode(
     JSON_THROW_ON_ERROR
 );
 
+if ($mode === 'prepare-retry') {
+    $fixture['event_ids'][1] = $fixture['event_ids'][0];
+
+    file_put_contents(
+        $fixturePath,
+        json_encode($fixture, JSON_PRETTY_PRINT | JSON_THROW_ON_ERROR)
+    );
+
+    echo "Both workers will use the same event_id.\n";
+    echo "Event ID: {$fixture['event_ids'][0]}\n";
+    exit(0);
+}
 if ($mode === 'worker') {
     $index = (int) ($argv[2] ?? -1);
     $targetMs = (int) ($argv[3] ?? 0);
