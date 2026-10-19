@@ -30,7 +30,8 @@ class UpdateProductRequest extends FormRequest
                     ->where('shop_id', $shopId)
                     ->ignore($productId),
             ],
-            'barcode' => ['sometimes', 'nullable', 'string', 'max:100'],
+            'barcode' => ['sometimes', 'nullable', 'string', 'max:100', Rule::unique('products', 'barcode')->where('shop_id', $shopId)->ignore($productId)],
+            'image' => ['nullable', 'image', 'mimes:jpeg,jpg,png,webp', 'max:2048'],
             'description' => ['sometimes', 'nullable', 'string', 'max:5000'],
             'product_category_id' => [
                 'sometimes', 'nullable', 'integer',

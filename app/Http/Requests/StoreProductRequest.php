@@ -27,7 +27,8 @@ class StoreProductRequest extends FormRequest
                 'required', 'string', 'max:100',
                 Rule::unique('products', 'sku')->where('shop_id', $shopId),
             ],
-            'barcode' => ['nullable', 'string', 'max:100'],
+            'barcode' => ['nullable', 'string', 'max:100', Rule::unique('products', 'barcode')->where('shop_id', $shopId)],
+            'image' => ['nullable', 'image', 'mimes:jpeg,jpg,png,webp', 'max:2048'],
             'description' => ['nullable', 'string', 'max:5000'],
             'product_category_id' => [
                 'nullable', 'integer',

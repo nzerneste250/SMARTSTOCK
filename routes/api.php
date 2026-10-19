@@ -47,6 +47,10 @@ Route::middleware('auth:sanctum')
     ->prefix('shops/{shopId}')
     ->whereNumber('shopId')
     ->group(function () {
+        Route::get('/dashboard',
+            [\App\Http\Controllers\Api\DashboardController::class, 'show']
+        );
+
         Route::get('/cashiers',
             [\App\Http\Controllers\Api\ShopCashierController::class, 'index']
         );
@@ -87,6 +91,10 @@ Route::middleware('auth:sanctum')
 
         Route::patch('/products/{productId}',
             [\App\Http\Controllers\Api\ProductController::class, 'update']
+        )->whereNumber('productId');
+
+        Route::delete('/products/{productId}/image',
+            [\App\Http\Controllers\Api\ProductController::class, 'removeImage']
         )->whereNumber('productId');
     });
 

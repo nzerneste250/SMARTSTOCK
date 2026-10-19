@@ -9,10 +9,18 @@ use App\Services\AccessService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
 
 class ProductController extends Controller
 {
+    private function present($product): array
+    {
+        $value = (array) $product;
+        $value['image_url'] = !empty($value['image_path'])
+            ? request()->getSchemeAndHttpHost().'/storage/'.ltrim($value['image_path'], '/') : null;
+        return $value;
+    }
     public function index(Request $request, int $shopId): JsonResponse
     {
         abort_unless(
@@ -40,6 +48,7 @@ class ProductController extends Controller
             ->orderBy('products.name')
             ->paginate(25);
 
+        $products->getCollection()->transform(fn ($p) => $this->present($p));
         return response()->json($products);
     }
 
@@ -48,6 +57,7 @@ class ProductController extends Controller
         int $shopId
     ): JsonResponse {
         $data = $request->validated();
+        unset($data['image']);
 
         $product = DB::transaction(function () use ($shopId, $data, $request) {
             $shop = DB::table('shops')
@@ -76,6 +86,8 @@ class ProductController extends Controller
                 abort_unless($validCategory, 422);
             }
 
+            $imagePath = $request->hasFile('image')
+                ? $request->file('image')->store('products/'.$shopId, 'public') : null;
             $id = DB::table('products')->insertGetId([
                 'public_id' => (string) Str::uuid(),
                 'shop_id' => $shopId,
@@ -84,6 +96,7 @@ class ProductController extends Controller
                 'sku' => $data['sku'],
                 'barcode' => $data['barcode'] ?? null,
                 'description' => $data['description'] ?? null,
+                'image_path' => $imagePath,
                 'selling_price' => $data['selling_price'],
                 'cost_price' => $data['cost_price'] ?? null,
                 'unit' => $data['unit'] ?? 'piece',
@@ -109,7 +122,7 @@ class ProductController extends Controller
 
         return response()->json([
             'message' => 'Product created successfully.',
-            'product' => $product,
+            'product' => $this->present($product),
         ], 201);
     }
 
@@ -119,6 +132,7 @@ class ProductController extends Controller
         int $productId
     ): JsonResponse {
         $data = $request->validated();
+        unset($data['image']);
 
         $product = DB::transaction(function () use (
             $request, $shopId, $productId, $data
@@ -155,6 +169,12 @@ class ProductController extends Controller
                 abort_unless($validCategory, 422);
             }
 
+            if ($request->hasFile('image')) {
+                $newPath = $request->file('image')->store('products/'.$shopId, 'public');
+                if ($product->image_path) Storage::disk('public')->delete($product->image_path);
+                $data['image_path'] = $newPath;
+            }
+
             if (!empty($data)) {
                 $data['updated_at'] = now();
 
@@ -172,7 +192,18 @@ class ProductController extends Controller
 
         return response()->json([
             'message' => 'Product updated successfully.',
-            'product' => $product,
+            'product' => $this->present($product),
         ]);
+    }
+
+    public function removeImage(Request $request, int $shopId, int $productId): JsonResponse
+    {
+        abort_unless(app(AccessService::class)->canManageShop($request->user(), $shopId), 403);
+        $product = DB::table('products')->where('id', $productId)->where('shop_id', $shopId)->first();
+        abort_unless($product, 404);
+        if ($product->image_path) Storage::disk('public')->delete($product->image_path);
+        DB::table('products')->where('id', $productId)->update(['image_path' => null, 'updated_at' => now()]);
+        $product->image_path = null;
+        return response()->json(['message' => 'Product image removed.', 'product' => $this->present($product)]);
     }
 }
